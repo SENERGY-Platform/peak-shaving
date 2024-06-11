@@ -1,3 +1,3 @@
-# Consumption Profile
+# Peak Shaving
 
 ## Config options
