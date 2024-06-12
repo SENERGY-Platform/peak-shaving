@@ -17,10 +17,13 @@
 __all__ = ("Operator", )
 
 from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str
+from operator_lib.util.persistence import save, load
 import os
 import pandas as pd
 from load import Load
 from battery import Battery
+
+FIRST_DATA_FILENAME = "first_data_time.pickle"
 
 from operator_lib.util import Config
 class CustomConfig(Config):
@@ -55,6 +58,8 @@ class Operator(OperatorBase):
         self.load = Load()
         self.battery = Battery()
 
+        self.first_data_time = load(self.config.data_path, FIRST_DATA_FILENAME)
+
         self.init_phase_duration = pd.Timedelta(self.config.init_phase_length, self.config.init_phase_level)        
         self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
         value = {
@@ -65,6 +70,11 @@ class Operator(OperatorBase):
 
     def run(self, data, selector = None, device_id=None):
         current_timestamp = todatetime(data['Power_Time'])
+        if not self.first_data_time:
+            self.first_data_time = current_timestamp
+            save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
+            self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
+
         if current_timestamp < pd.Timestamp.now():
             self.historic_data_available = True
         if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_done:
