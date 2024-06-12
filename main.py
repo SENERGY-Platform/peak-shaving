@@ -92,9 +92,9 @@ class Operator(OperatorBase):
         elif charge:
             real_c_power = self.battery.charge(c_power)
             battery_power = real_c_power
-        self.load.track_high_seg()
-        self.load.update_corrected_max(battery_power=battery_power)
-        self.load.update_max()
+        self.load.track_high_seg(new_point)
+        self.load.update_corrected_max(battery_power, new_point)
+        self.load.update_max(new_point)
         self.load.update_segments()
 
         init_value = {
