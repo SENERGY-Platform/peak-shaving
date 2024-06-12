@@ -83,8 +83,8 @@ class Operator(OperatorBase):
         new_point = data['Power']
         logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
-        discharge, dc_power = self.load.discharge_check(self.battery)
-        charge, c_power = self.load.charge_check()
+        discharge, dc_power = self.load.discharge_check(self.battery, new_point)
+        charge, c_power = self.load.charge_check(new_point)
     
         if discharge:
             real_dc_power = self.battery.discharge(dc_power)
