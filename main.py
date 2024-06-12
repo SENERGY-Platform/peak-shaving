@@ -71,7 +71,7 @@ class Operator(OperatorBase):
             # TODO: Implement start of clustering training here!
             self.training_done = True
         new_point = data['Power']
-        logger.debug('Humidity: '+str(new_point)+'  '+'Humidity Time: '+ timestamp_to_str(current_timestamp))
+        logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
         discharge, dc_power = self.load.discharge_check(self.battery)
         charge, c_power = self.load.charge_check()
