@@ -69,7 +69,7 @@ class Operator(OperatorBase):
         self.init_phase_handler.send_first_init_msg(value) 
 
     def run(self, data, selector = None, device_id=None):
-        current_timestamp = todatetime(data['Power_Time'])
+        current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
         if not self.first_data_time:
             self.first_data_time = current_timestamp
             save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
