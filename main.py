@@ -25,6 +25,19 @@ from battery import Battery
 from operator_lib.util import Config
 class CustomConfig(Config):
     data_path = "/opt/data"
+    init_phase_length: float = 2
+    init_phase_level: str = "d"
+
+    def __init__(self, d, **kwargs):
+        super().__init__(d, **kwargs)
+
+        if self.init_phase_length != '':
+            self.init_phase_length = float(self.init_phase_length)
+        else:
+            self.init_phase_length = 2
+        
+        if self.init_phase_level == '':
+            self.init_phase_level = 'd'
 
 class Operator(OperatorBase):
     configType = CustomConfig
@@ -41,6 +54,14 @@ class Operator(OperatorBase):
 
         self.load = Load()
         self.battery = Battery()
+
+        self.init_phase_duration = pd.Timedelta(self.config.init_phase_length, self.config.init_phase_level)        
+        self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
+        value = {
+            "battery_power": 0,
+            "timestamp": timestamp_to_str(pd.Timestamp.now())
+        }
+        self.init_phase_handler.send_first_init_msg(value) 
 
     def run(self, data, selector = None, device_id=None):
         current_timestamp = todatetime(data['Power_Time'])
@@ -65,6 +86,19 @@ class Operator(OperatorBase):
         self.load.update_corrected_max(battery_power=battery_power)
         self.load.update_max()
         self.load.update_segments()
+
+        init_value = {
+            "battery_power": 0,
+            "timestamp": timestamp_to_str(current_timestamp)
+        }
+        operator_is_init = self.init_phase_handler.operator_is_in_init_phase(current_timestamp)
+        if operator_is_init:
+            return self.init_phase_handler.generate_init_msg(current_timestamp, init_value)
+
+        if self.init_phase_handler.init_phase_needs_to_be_reset():
+            return self.init_phase_handler.reset_init_phase(init_value)
+        
+        return {"battery_power": battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
         
 
 
