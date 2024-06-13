@@ -70,8 +70,8 @@ class Operator(OperatorBase):
         }
         self.init_phase_handler.send_first_init_msg(value) 
 
-        self.power_data = []
-        self.battery_data = []
+        self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
+        self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
 
     def stop(self):
         super().stop()
