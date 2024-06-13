@@ -24,6 +24,8 @@ from load import Load
 from battery import Battery
 
 FIRST_DATA_FILENAME = "first_data_time.pickle"
+POWER_DATA_FILENAME = "power_data.pickle"
+BATTERY_DATA_FILENAME = "battery_data.pickle"
 
 from operator_lib.util import Config
 class CustomConfig(Config):
@@ -68,11 +70,19 @@ class Operator(OperatorBase):
         }
         self.init_phase_handler.send_first_init_msg(value) 
 
+        self.power_data = []
+        self.battery_data = []
+
+    def stop(self):
+        super().stop()
+        save(self.data_path, POWER_DATA_FILENAME, self.power_data)
+        save(self.data_path, BATTERY_DATA_FILENAME, self.battery_data)
+        save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
+
     def run(self, data, selector = None, device_id=None):
         current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
         if not self.first_data_time:
             self.first_data_time = current_timestamp
-            save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
             self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
 
         if current_timestamp < pd.Timestamp.now():
@@ -81,6 +91,7 @@ class Operator(OperatorBase):
             # TODO: Implement start of clustering training here!
             self.training_done = True
         new_point = data['Power']
+        self.power_data.append(new_point)
         logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
         discharge, dc_power = self.load.discharge_check(self.battery, new_point)
@@ -103,7 +114,10 @@ class Operator(OperatorBase):
         }
         operator_is_init = self.init_phase_handler.operator_is_in_init_phase(current_timestamp)
         if operator_is_init:
+            self.battery_data.append(0)
             return self.init_phase_handler.generate_init_msg(current_timestamp, init_value)
+        
+        self.battery_data.append(battery_power)
 
         if self.init_phase_handler.init_phase_needs_to_be_reset():
             return self.init_phase_handler.reset_init_phase(init_value)
