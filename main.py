@@ -38,6 +38,8 @@ class CustomConfig(Config):
     data_path = "/opt/data"
     init_phase_length: float = 2
     init_phase_level: str = "d"
+    ml_trainer_url: str = "http://ml-trainer-svc.trainer:5000"
+    mlflow_url: str = "http://mlflow-svc.mlflow:5000"
 
     def __init__(self, d, **kwargs):
         super().__init__(d, **kwargs)
@@ -64,6 +66,9 @@ class Operator(OperatorBase):
 
         self.historic_data_available = None
         self.training_started = None
+
+        self.ml_trainer_url = self.config.ml_trainer_url
+        self.mlflow_url = self.config.mlflow_url
 
         self.load = Load()
         self.battery = Battery()
