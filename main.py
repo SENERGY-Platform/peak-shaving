@@ -18,14 +18,20 @@ __all__ = ("Operator", )
 
 from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str
 from operator_lib.util.persistence import save, load
+import operator_lib.util as util
 import os
 import pandas as pd
 from load import Load
 from battery import Battery
+import mlflow
+import requests
+import json
 
 FIRST_DATA_FILENAME = "first_data_time.pickle"
 POWER_DATA_FILENAME = "power_data.pickle"
 BATTERY_DATA_FILENAME = "battery_data.pickle"
+
+JOB_ID_FILENAME = "training_job_id.pickle"
 
 from operator_lib.util import Config
 class CustomConfig(Config):
@@ -54,8 +60,10 @@ class Operator(OperatorBase):
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
 
+        self.device_id = None
+
         self.historic_data_available = None
-        self.training_done = None
+        self.training_started = None
 
         self.load = Load()
         self.battery = Battery()
@@ -73,6 +81,81 @@ class Operator(OperatorBase):
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
 
+
+    def start_training(self, timestamp):
+        topic_name, path_to_time, path_to_value = self._get_input_topic()
+        job_request = {
+            "task": "ml_fit",
+            "task_settings": {
+                "use_case": "peak-shaving"
+            },
+            "experiment_name": "",
+            "data_source": "kafka",
+            "data_settings": {
+                "name": topic_name,
+                "path_to_time": path_to_time,
+                "path_to_value": path_to_value,
+                "filterType": "device_id",
+                "filterValue": self.device_id,
+                "ksql_url": "http://ksql.kafka-sql:8088",
+                "timestamp_format": "unix", #yyyy-MM-ddTHH:mm:ss.SSSZ
+                "time_range_value": "1",
+                "time_range_level": "d"
+            },
+            "toolbox_version": "v2.2.49",
+            "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8"
+        }
+        util.logger.debug(f"Start online training")
+        res = requests.post(self.ml_trainer_url + "/mlfit", json=job_request)
+        util.logger.debug(f"ML Trainer Response: {res.text}")
+        if res.status_code != 200:
+            util.logger.error(f"Cant start training job {res.text}")
+            return
+        self.job_id = res.json()['task_id']
+        util.logger.debug(f"Created Training Job with ID: {self.job_id}")
+        self.last_training_time = timestamp
+        save(self.data_path, JOB_ID_FILENAME, self.job_id)
+
+    def is_job_ready(self):
+        res = requests.get(self.ml_trainer_url + "/job/"+self.job_id)
+        res_data = res.json()
+        job_status = res_data['success'] 
+        util.logger.debug(f"Training Job Status: {job_status}")
+        if job_status == 'error':
+            raise Exception(res_data['response'])
+
+        return job_status == 'done'
+    
+    def load_model(self):
+        mlflow.set_tracking_uri(self.mlflow_url)
+        model_uri = f"models:/{self.job_id}@production"
+        util.logger.debug(f"Try to download model {self.job_id}")
+        self.model = mlflow.pyfunc.load_model(model_uri)
+        util.logger.debug(f"Downloading model {self.job_id} was succesfull")
+        unwrapped_model = self.model.unwrap_python_model()
+        min_boundaries = unwrapped_model.get_cluster_min_boundaries()
+        max_boundaries = unwrapped_model.get_cluster_max_boundaries()
+        return min_boundaries, max_boundaries
+
+    def _get_input_topic(self):
+        dep_config = util.DeploymentConfig()
+        config_json = json.loads(dep_config.config)
+        opr_config = util.OperatorConfig(config_json)
+        topic_name = None
+        path_to_time = None 
+        path_to_value = None
+        for input_topic in opr_config.inputTopics:
+            if self.device_id in input_topic.filterValue.split(','):
+                topic_name = input_topic.name
+                for mapping in input_topic.mappings:
+                    if mapping.dest == "value":
+                        path_to_value = mapping.source
+                    
+                    if mapping.dest == "time":
+                        path_to_time = mapping.source
+
+        return topic_name, path_to_time, path_to_value
+
     def stop(self):
         super().stop()
         save(self.data_path, POWER_DATA_FILENAME, self.power_data)
@@ -80,6 +163,8 @@ class Operator(OperatorBase):
         save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
 
     def run(self, data, selector = None, device_id=None):
+        if not self.device_id:
+            self.device_id = device_id
         current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
         if not self.first_data_time:
             self.first_data_time = current_timestamp
@@ -87,12 +172,15 @@ class Operator(OperatorBase):
 
         if current_timestamp < pd.Timestamp.now():
             self.historic_data_available = True
-        if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_done:
-            # TODO: Implement start of clustering training here!
-            self.training_done = True
+        if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
+            self.start_training(current_timestamp)
+            self.training_started = True
+        if self.is_job_ready():
+            min_boundaries, max_boundaries = self.load_model()
+            util.logger.debug(f"Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
         new_point = data['Power']
         self.power_data.append(new_point)
-        logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
+        util.logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
         discharge, dc_power = self.load.discharge_check(self.battery, new_point)
         charge, c_power = self.load.charge_check(new_point)
