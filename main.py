@@ -154,10 +154,10 @@ class Operator(OperatorBase):
             if self.device_id in input_topic.filterValue.split(','):
                 topic_name = input_topic.name
                 for mapping in input_topic.mappings:
-                    if mapping.dest == "value":
+                    if mapping.dest == "Power":
                         path_to_value = mapping.source
                     
-                    if mapping.dest == "time":
+                    if mapping.dest == "Power_Time":
                         path_to_time = mapping.source
 
         return topic_name, path_to_time, path_to_value
