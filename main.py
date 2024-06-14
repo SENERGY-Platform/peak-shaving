@@ -108,7 +108,7 @@ class Operator(OperatorBase):
                 "time_range_value": "1",
                 "time_range_level": "d"
             },
-            "toolbox_version": "v2.2.51",
+            "toolbox_version": "v2.2.52",
             "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8"
         }
         util.logger.debug(f"Start online training")
