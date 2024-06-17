@@ -95,7 +95,7 @@ class Operator(OperatorBase):
         job_request = {
             "task": "ml_fit",
             "task_settings": {
-                "use_case": "peak-shaving"
+                "use_case": "peak_shaving"
             },
             "experiment_name": "",
             "data_source": "kafka",
