@@ -1,4 +1,5 @@
 git+https://github.com/SENERGY-Platform/analytics-operator-lib-python@v1.1.0
+git+https://github.com/SENERGY-Platform/timeseries-toolbox@v2.2.56
 
 pandas<2
 pyarrow
