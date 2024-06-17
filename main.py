@@ -30,7 +30,7 @@ import json
 FIRST_DATA_FILENAME = "first_data_time.pickle"
 POWER_DATA_FILENAME = "power_data.pickle"
 BATTERY_DATA_FILENAME = "battery_data.pickle"
-
+TRAINING_STARTED_FILENAME = "training_started.pickle"
 JOB_ID_FILENAME = "training_job_id.pickle"
 
 from operator_lib.util import Config
@@ -86,6 +86,8 @@ class Operator(OperatorBase):
 
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
+        self.job_id = load(self.config.data_path, JOB_ID_FILENAME, default=None)
+        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
 
 
     def start_training(self, timestamp):
@@ -167,6 +169,8 @@ class Operator(OperatorBase):
         save(self.data_path, POWER_DATA_FILENAME, self.power_data)
         save(self.data_path, BATTERY_DATA_FILENAME, self.battery_data)
         save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
+        save(self.data_path, JOB_ID_FILENAME, self.job_id)
+        save(self.data_path, TRAINING_STARTED_FILENAME, self.training_started)
 
     def run(self, data, selector = None, device_id=None):
         if not self.device_id:
