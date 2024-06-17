@@ -93,9 +93,9 @@ class Operator(OperatorBase):
     def start_training(self, timestamp):
         topic_name, path_to_time, path_to_value = self._get_input_topic()
         job_request = {
-            "task": "ml_fit",
+            "task": "peak_shaving",
             "task_settings": {
-                "use_case": "peak_shaving"
+                
             },
             "experiment_name": "",
             "data_source": "kafka",
