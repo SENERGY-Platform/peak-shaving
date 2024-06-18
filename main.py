@@ -112,6 +112,9 @@ class Operator(OperatorBase):
                 "time_range_level": "d"
             },
             "toolbox_version": "v2.2.72",
+            "cluster": {
+                "memory_worker_limit": "20G"
+            },
             "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8"
         }
         util.logger.debug(f"Start online training")
