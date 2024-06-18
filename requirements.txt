@@ -1,7 +1,2 @@
 git+https://github.com/SENERGY-Platform/analytics-operator-lib-python@v1.1.0
 toolbox[peak_shaving] @ git+https://github.com/SENERGY-Platform/timeseries-toolbox@v2.2.71
-
-
-#pandas<2
-#pyarrow
-#mlflow
