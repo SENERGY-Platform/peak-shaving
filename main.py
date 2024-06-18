@@ -189,7 +189,7 @@ class Operator(OperatorBase):
         if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
             self.start_training(current_timestamp)
             self.training_started = True
-        if self.job_id and self.is_job_ready() and self.model:
+        if self.job_id and self.is_job_ready() and not self.model:
             min_boundaries, max_boundaries = self.load_model()
             util.logger.debug(f"Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
         new_point = data['Power']
