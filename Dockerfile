@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-runtime
 LABEL org.opencontainers.image.source https://github.com/SENERGY-Platform/peak-shaving
 WORKDIR /usr/src/app
 COPY . .
