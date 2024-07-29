@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str
+from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str, get_ts_format_from_str
 from operator_lib.util.persistence import save, load
 import operator_lib.util as util
 import os
@@ -107,7 +107,7 @@ class Operator(OperatorBase):
                 "filterType": "device_id",
                 "filterValue": self.device_id,
                 "ksql_url": "http://ksql.kafka-sql:8088",
-                "timestamp_format": "yyyy-MM-ddTHH:mm:ss", #yyyy-MM-ddTHH:mm:ss.SSSZ
+                "timestamp_format": get_ts_format_from_str(timestamp), # "yyyy-MM-ddTHH:mm:ss", #yyyy-MM-ddTHH:mm:ss.SSSZ
                 "time_range_value": "2",
                 "time_range_level": "d"
             },
