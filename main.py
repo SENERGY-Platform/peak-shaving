@@ -91,7 +91,7 @@ class Operator(OperatorBase):
         self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
 
 
-    def start_training(self, timestamp):
+    def start_training(self, timestamp, raw_timestamp):
         topic_name, path_to_time, path_to_value = self._get_input_topic()
         job_request = {
             "task": "peak_shaving",
@@ -107,7 +107,7 @@ class Operator(OperatorBase):
                 "filterType": "device_id",
                 "filterValue": self.device_id,
                 "ksql_url": "http://ksql.kafka-sql:8088",
-                "timestamp_format": get_ts_format_from_str(timestamp), # "yyyy-MM-ddTHH:mm:ss", #yyyy-MM-ddTHH:mm:ss.SSSZ
+                "timestamp_format": get_ts_format_from_str(raw_timestamp), # "yyyy-MM-ddTHH:mm:ss", #yyyy-MM-ddTHH:mm:ss.SSSZ
                 "time_range_value": "2",
                 "time_range_level": "d"
             },
@@ -187,7 +187,7 @@ class Operator(OperatorBase):
         if current_timestamp < pd.Timestamp.now():
             self.historic_data_available = True
         if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
-            self.start_training(current_timestamp)
+            self.start_training(current_timestamp, data['Power_Time'])
             self.training_started = True
         if self.job_id and self.is_job_ready() and not self.model:
             min_boundaries, max_boundaries = self.load_model()
