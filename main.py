@@ -169,13 +169,13 @@ class Operator(OperatorBase):
         return topic_name, path_to_time, path_to_value
 
     def stop(self):
-        super().stop()
         save(self.data_path, POWER_DATA_FILENAME, self.power_data)
         save(self.data_path, BATTERY_DATA_FILENAME, self.battery_data)
         save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
         save(self.data_path, JOB_ID_FILENAME, self.job_id)
         save(self.data_path, TRAINING_STARTED_FILENAME, self.training_started)
-
+        super().stop()
+        
     def run(self, data, selector = None, device_id=None):
         if not self.device_id:
             self.device_id = device_id
