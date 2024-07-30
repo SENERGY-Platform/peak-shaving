@@ -111,7 +111,7 @@ class Operator(OperatorBase):
                 "time_range_value": "2",
                 "time_range_level": "d"
             },
-            "toolbox_version": "v2.2.72",
+            "toolbox_version": "v2.2.85",
             "cluster": {
                 "memory_worker_limit": "20G"
             },
