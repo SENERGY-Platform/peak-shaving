@@ -95,10 +95,6 @@ class Operator(OperatorBase):
         topic_name, path_to_time, path_to_value = self._get_input_topic()
         job_request = {
             "task": "peak_shaving",
-            "task_settings": {
-                
-            },
-            "experiment_name": "",
             "data_source": "kafka",
             "data_settings": {
                 "name": topic_name,
