@@ -116,7 +116,7 @@ class Operator(OperatorBase):
                 "memory_worker_limit": "20G"
             },
             "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8",
-            "user_id: ""
+            "user_id": ""
         }
         util.logger.debug(f"Start online training")
         res = requests.post(self.ml_trainer_url + "/job", json=job_request)
