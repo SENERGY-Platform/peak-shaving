@@ -118,7 +118,7 @@ class Operator(OperatorBase):
             "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8"
         }
         util.logger.debug(f"Start online training")
-        res = requests.post(self.ml_trainer_url + "/mlfit", json=job_request)
+        res = requests.post(self.ml_trainer_url + "/job", json=job_request)
         util.logger.debug(f"ML Trainer Response: {res.text}")
         if res.status_code != 200:
             util.logger.error(f"Cant start training job {res.text}")
