@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str, get_ts_format_from_str
+from operator_lib.util import OperatorBase, Selector, logger, InitPhase, todatetime, timestamp_to_str, get_ts_format_from_str
 from operator_lib.util.persistence import save, load
 import operator_lib.util as util
 import os
@@ -40,6 +40,7 @@ class CustomConfig(Config):
     init_phase_level: str = "d"
     ml_trainer_url: str = "http://ml-trainer-svc.trainer:5000"
     mlflow_url: str = "http://mlflow-svc.mlflow:5000"
+    max_capacity: float = 500 # Wattstunden
 
     def __init__(self, d, **kwargs):
         super().__init__(d, **kwargs)
@@ -55,9 +56,15 @@ class CustomConfig(Config):
 class Operator(OperatorBase):
     configType = CustomConfig
 
+    selectors = [
+        Selector({"name": "battery", "args": ["capacity", "capacity_time"]}),
+        Selector({"name": "consumption_device", "args": ["power", "power_time"]})
+    ]
+
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
         self.data_path = self.config.data_path
+        self.max_capacity = self.config.max_capacity
         
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
@@ -73,7 +80,7 @@ class Operator(OperatorBase):
         self.mlflow_url = self.config.mlflow_url
 
         self.load = Load()
-        self.battery = Battery()
+        self.battery = None
 
         self.first_data_time = load(self.config.data_path, FIRST_DATA_FILENAME)
 
@@ -173,55 +180,63 @@ class Operator(OperatorBase):
         save(self.data_path, TRAINING_STARTED_FILENAME, self.training_started)
         super().stop()
         
-    def run(self, data, selector = None, device_id=None):
-        if not self.device_id:
-            self.device_id = device_id
-        current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
-        if not self.first_data_time:
-            self.first_data_time = current_timestamp
-            self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
+    def run(self, data, selector, device_id=None):
+        if selector == "consumption_device":
+            if not self.device_id:
+                self.device_id = device_id
+            current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
+            if not self.first_data_time:
+                self.first_data_time = current_timestamp
+                self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
 
-        if current_timestamp < pd.Timestamp.now():
-            self.historic_data_available = True
-        if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
-            self.start_training(current_timestamp, data['Power_Time'])
-            self.training_started = True
-        if self.job_id and self.is_job_ready() and not self.model:
-            min_boundaries, max_boundaries = self.load_model()
-            util.logger.debug(f"Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
-        new_point = data['Power']
-        self.power_data.append(new_point)
-        util.logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
+            if current_timestamp < pd.Timestamp.now():
+                self.historic_data_available = True
+            if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
+                self.start_training(current_timestamp, data['Power_Time'])
+                self.training_started = True
+            if self.job_id and self.is_job_ready() and not self.model:
+                min_boundaries, max_boundaries = self.load_model()
+                util.logger.debug(f"Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
+            new_point = data['Power']
+            self.power_data.append(new_point)
+            util.logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
-        discharge, dc_power = self.load.discharge_check(self.battery, new_point)
-        charge, c_power = self.load.charge_check(new_point)
+            self.load.track_high_seg(new_point)
+            self.load.update_max(new_point)
+            self.load.update_segments()
+
+            init_value = {
+                "battery_power": 0,
+                "timestamp": timestamp_to_str(current_timestamp)
+            }
+            operator_is_init = self.init_phase_handler.operator_is_in_init_phase(current_timestamp)
+            if operator_is_init:
+                self.battery_data.append(0)
+                return self.init_phase_handler.generate_init_msg(current_timestamp, init_value)
+            if self.init_phase_handler.init_phase_needs_to_be_reset():
+                return self.init_phase_handler.reset_init_phase(init_value)
+
+            if self.battery != None:
+                discharge, dc_power = self.load.discharge_check(self.battery, new_point)
+                charge, c_power = self.load.charge_check(new_point)
     
-        if discharge:
-            real_dc_power = self.battery.discharge(dc_power)
-            battery_power = -real_dc_power
-        elif charge:
-            real_c_power = self.battery.charge(c_power)
-            battery_power = real_c_power
-        self.load.track_high_seg(new_point)
-        self.load.update_corrected_max(battery_power, new_point)
-        self.load.update_max(new_point)
-        self.load.update_segments()
-
-        init_value = {
-            "battery_power": 0,
-            "timestamp": timestamp_to_str(current_timestamp)
-        }
-        operator_is_init = self.init_phase_handler.operator_is_in_init_phase(current_timestamp)
-        if operator_is_init:
-            self.battery_data.append(0)
-            return self.init_phase_handler.generate_init_msg(current_timestamp, init_value)
+                if discharge:
+                    battery_power = -dc_power
+                elif charge:
+                    battery_power = c_power
         
-        self.battery_data.append(battery_power)
-
-        if self.init_phase_handler.init_phase_needs_to_be_reset():
-            return self.init_phase_handler.reset_init_phase(init_value)
+                self.load.update_corrected_max(battery_power, new_point)
+                self.battery_data.append(battery_power)
         
-        return {"battery_power": battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+            return {"battery_power": battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+        elif selector == "battery":
+            current_capacity = data["capacity"]
+            capacity_time = todatetime(data["capacity_time"]).tz_localize(None)
+            logger.debug(f"Current Capacity: {current_capacity}; time: {capacity_time}")
+            if self.battery == None:
+                self.battery = Battery(current_capacity)
+            else:
+                self.battery.capacity = current_capacity
         
 
 

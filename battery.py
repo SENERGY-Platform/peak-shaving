@@ -1,8 +1,6 @@
 class Battery():
-    def __init__(self, capacity=1000*120*6, max_power=1000):
-        self.max_capacity = capacity
-        self.capacity = self.max_capacity
-        self.max_power = max_power
+    def __init__(self, capacity):
+        self.capacity = capacity
     
     def charge(self, power):
         if power >= self.max_power:
