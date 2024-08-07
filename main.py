@@ -74,7 +74,6 @@ class Operator(OperatorBase):
         self.model = None
 
         self.historic_data_available = None
-        self.training_started = True
 
         self.ml_trainer_url = self.config.ml_trainer_url
         self.mlflow_url = self.config.mlflow_url
@@ -95,7 +94,7 @@ class Operator(OperatorBase):
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
         self.job_id = load(self.config.data_path, JOB_ID_FILENAME, default=None)
-        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
+        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=True)
 
 
     def start_training(self, timestamp, raw_timestamp):
