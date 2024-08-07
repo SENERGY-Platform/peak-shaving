@@ -184,7 +184,7 @@ class Operator(OperatorBase):
         if selector == "consumption_device":
             if not self.device_id:
                 self.device_id = device_id
-            current_timestamp = todatetime(data['Power_Time']).tz_localize(None)
+            current_timestamp = todatetime(data['power_time']).tz_localize(None)
             if not self.first_data_time:
                 self.first_data_time = current_timestamp
                 self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
@@ -192,12 +192,12 @@ class Operator(OperatorBase):
             if current_timestamp < pd.Timestamp.now():
                 self.historic_data_available = True
             if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
-                self.start_training(current_timestamp, data['Power_Time'])
+                self.start_training(current_timestamp, data['power_time'])
                 self.training_started = True
             if self.job_id and self.is_job_ready() and not self.model:
                 min_boundaries, max_boundaries = self.load_model()
                 util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
-            new_point = data['Power']
+            new_point = data['power']
             self.power_data.append(new_point)
             util.logger.debug('PEAK SHAVING:        Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
