@@ -121,14 +121,14 @@ class Operator(OperatorBase):
             "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8",
             "user_id": ""
         }
-        util.logger.debug(f"Start online training")
+        util.logger.debug(f"PEAK SHAVING:        Start online training")
         res = requests.post(self.ml_trainer_url + "/job", json=job_request)
-        util.logger.debug(f"ML Trainer Response: {res.text}")
+        util.logger.debug(f"PEAK SHAVING:        ML Trainer Response: {res.text}")
         if res.status_code != 200:
-            util.logger.error(f"Cant start training job {res.text}")
+            util.logger.error(f"CPEAK SHAVING:        ant start training job {res.text}")
             return
         self.job_id = res.json()['task_id']
-        util.logger.debug(f"Created Training Job with ID: {self.job_id}")
+        util.logger.debug(f"PEAK SHAVING:        Created Training Job with ID: {self.job_id}")
         self.last_training_time = timestamp
         save(self.data_path, JOB_ID_FILENAME, self.job_id)
 
@@ -136,7 +136,7 @@ class Operator(OperatorBase):
         res = requests.get(self.ml_trainer_url + "/job/"+self.job_id)
         res_data = res.json()
         job_status = res_data['success'] 
-        util.logger.debug(f"Training Job Status: {job_status}")
+        util.logger.debug(f"PEAK SHAVING:        Training Job Status: {job_status}")
         if job_status == 'error':
             raise Exception(res_data['response'])
 
@@ -145,9 +145,9 @@ class Operator(OperatorBase):
     def load_model(self):
         mlflow.set_tracking_uri(self.mlflow_url)
         model_uri = f"models:/{self.job_id}@production"
-        util.logger.debug(f"Try to download model {self.job_id}")
+        util.logger.debug(f"PEAK SHAVING:        Try to download model {self.job_id}")
         self.model = mlflow.pyfunc.load_model(model_uri)
-        util.logger.debug(f"Downloading model {self.job_id} was succesfull")
+        util.logger.debug(f"PEAK SHAVING:        Downloading model {self.job_id} was succesfull")
         unwrapped_model = self.model.unwrap_python_model()
         min_boundaries = unwrapped_model.get_cluster_min_boundaries()
         max_boundaries = unwrapped_model.get_cluster_max_boundaries()
@@ -196,10 +196,10 @@ class Operator(OperatorBase):
                 self.training_started = True
             if self.job_id and self.is_job_ready() and not self.model:
                 min_boundaries, max_boundaries = self.load_model()
-                util.logger.debug(f"Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
+                util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
             new_point = data['Power']
             self.power_data.append(new_point)
-            util.logger.debug('Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
+            util.logger.debug('PEAK SHAVING:        Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
             self.load.track_high_seg(new_point)
             self.load.update_max(new_point)
@@ -232,7 +232,7 @@ class Operator(OperatorBase):
         elif selector == "battery":
             current_capacity = data["capacity"]
             capacity_time = todatetime(data["capacity_time"]).tz_localize(None)
-            logger.debug(f"Current Capacity: {current_capacity}; time: {capacity_time}")
+            logger.debug(f"PEAK SHAVING:        Current Capacity: {current_capacity}; time: {capacity_time}")
             if self.battery == None:
                 self.battery = Battery(current_capacity)
             else:
