@@ -197,7 +197,8 @@ class Operator(OperatorBase):
                 min_boundaries, max_boundaries = self.load_model()
                 util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
             new_point = data['power']
-            self.power_data.append(new_point)
+            self.power_data.append({"power": new_point, "time": current_timestamp})
+            save(self.data_path, POWER_DATA_FILENAME, self.power_data)
             util.logger.debug('PEAK SHAVING:        Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
             self.load.track_high_seg(new_point)
