@@ -226,6 +226,10 @@ class Operator(OperatorBase):
         
                 self.load.update_corrected_max(battery_power, new_point)
                 self.battery_data.append(battery_power)
+            else:
+                battery_power = 0
+                self.load.update_corrected_max(battery_power, new_point)
+                self.battery_data.append(battery_power)
         
             return {"battery_power": battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
         elif selector == "battery":
