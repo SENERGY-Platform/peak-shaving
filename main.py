@@ -74,7 +74,7 @@ class Operator(OperatorBase):
         self.model = None
 
         self.historic_data_available = None
-        self.training_started = None
+        self.training_started = True
 
         self.ml_trainer_url = self.config.ml_trainer_url
         self.mlflow_url = self.config.mlflow_url
