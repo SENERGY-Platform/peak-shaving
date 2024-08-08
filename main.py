@@ -224,7 +224,8 @@ class Operator(OperatorBase):
 
             init_value = {
                 "battery_power": 0,
-                "timestamp": timestamp_to_str(current_timestamp)
+                "timestamp": timestamp_to_str(current_timestamp),
+                "trigger_battery": "no"
             }
             operator_is_init = self.init_phase_handler.operator_is_in_init_phase(current_timestamp)
             if operator_is_init:
@@ -234,7 +235,7 @@ class Operator(OperatorBase):
                 return self.init_phase_handler.reset_init_phase(init_value)
             
             if self.one_min_window_ended == False:
-                return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+                return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "trigger_battery": "no", "initial_phase": ""}
 
             if self.battery != None:
                 discharge, dc_power = self.load.discharge_check(self.battery, new_one_min_average_power)
@@ -252,7 +253,7 @@ class Operator(OperatorBase):
                 self.load.update_corrected_max(self.battery_power, new_one_min_average_power)
                 self.battery_data.append(self.battery_power)
         
-            return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+            return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "trigger_battery": "yes", "initial_phase": ""}
         elif selector == "battery":
             current_capacity = data["capacity"]
             capacity_time = todatetime(data["capacity_time"]).tz_localize(None)
