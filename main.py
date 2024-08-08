@@ -234,7 +234,7 @@ class Operator(OperatorBase):
                 return self.init_phase_handler.reset_init_phase(init_value)
             
             if self.one_min_window_ended == False:
-                return {"battery_power": 0, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+                return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
 
             if self.battery != None:
                 discharge, dc_power = self.load.discharge_check(self.battery, new_one_min_average_power)
