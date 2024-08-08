@@ -21,6 +21,7 @@ from operator_lib.util.persistence import save, load
 import operator_lib.util as util
 import os
 import pandas as pd
+import numpy as np
 from load import Load
 from battery import Battery
 import mlflow
@@ -80,6 +81,7 @@ class Operator(OperatorBase):
 
         self.load = Load()
         self.battery = None
+        self.battery_power = 0
 
         self.first_data_time = load(self.config.data_path, FIRST_DATA_FILENAME)
 
@@ -95,6 +97,8 @@ class Operator(OperatorBase):
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
         self.job_id = load(self.config.data_path, JOB_ID_FILENAME, default=None)
         self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=True)
+
+        self.one_min_data_window = []
 
 
     def start_training(self, timestamp, raw_timestamp):
@@ -197,13 +201,26 @@ class Operator(OperatorBase):
                 min_boundaries, max_boundaries = self.load_model()
                 util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
             new_point = data['power']
-            self.power_data.append({"power": new_point, "time": current_timestamp})
-            save(self.data_path, POWER_DATA_FILENAME, self.power_data)
-            util.logger.debug('PEAK SHAVING:        Power: '+str(new_point)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
-            self.load.track_high_seg(new_point)
-            self.load.update_max(new_point)
-            self.load.update_segments()
+            if self.one_min_data_window == []:
+                self.one_min_data_window.append({"power": new_point, "time": current_timestamp})
+                self.one_min_window_ended = False
+            else:
+                if current_timestamp - self.one_min_data_window[0]["time"] <= pd.Timedelta(1,"min"):
+                    self.one_min_data_window.append({"power": new_point, "time": current_timestamp})
+                    self.one_min_window_ended = False
+                else:
+                    new_one_min_average_power = np.mean([entry["power"] for entry in self.one_min_data_window])
+                    self.one_min_data_window = [{"power": new_point, "time": current_timestamp}]
+                    self.one_min_window_ended = True
+                    
+                    self.load.track_high_seg(new_one_min_average_power)
+                    self.load.update_max(new_one_min_average_power)
+                    self.load.update_segments()
+                    
+                    self.power_data.append({"power": new_one_min_average_power, "time": current_timestamp})
+                    save(self.data_path, POWER_DATA_FILENAME, self.power_data)
+                    util.logger.debug('PEAK SHAVING:        Power: '+str(new_one_min_average_power)+'  '+'Power Time: '+ timestamp_to_str(current_timestamp))
 
             init_value = {
                 "battery_power": 0,
@@ -215,24 +232,27 @@ class Operator(OperatorBase):
                 return self.init_phase_handler.generate_init_msg(current_timestamp, init_value)
             if self.init_phase_handler.init_phase_needs_to_be_reset():
                 return self.init_phase_handler.reset_init_phase(init_value)
+            
+            if self.one_min_window_ended == False:
+                return {"battery_power": 0, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
 
             if self.battery != None:
-                discharge, dc_power = self.load.discharge_check(self.battery, new_point)
-                charge, c_power = self.load.charge_check(new_point)
+                discharge, dc_power = self.load.discharge_check(self.battery, new_one_min_average_power)
+                charge, c_power = self.load.charge_check(new_one_min_average_power)
     
                 if discharge:
-                    battery_power = -dc_power
+                    self.battery_power = -dc_power
                 elif charge:
-                    battery_power = c_power
+                    self.battery_power = c_power
         
-                self.load.update_corrected_max(battery_power, new_point)
-                self.battery_data.append(battery_power)
+                self.load.update_corrected_max(self.battery_power, new_one_min_average_power)
+                self.battery_data.append(self.battery_power)
             else:
-                battery_power = 0
-                self.load.update_corrected_max(battery_power, new_point)
-                self.battery_data.append(battery_power)
+                self.battery_power = 0
+                self.load.update_corrected_max(self.battery_power, new_one_min_average_power)
+                self.battery_data.append(self.battery_power)
         
-            return {"battery_power": battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
+            return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "initial_phase": ""}
         elif selector == "battery":
             current_capacity = data["capacity"]
             capacity_time = todatetime(data["capacity_time"]).tz_localize(None)
