@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 class Load():
     def __init__(self):
@@ -34,19 +35,20 @@ class Load():
         self.half_seg = self.max/2
         self.three_quarter_seg = 3*self.max/4
 
-    def track_high_seg(self, new_point):
+    def track_high_seg(self, new_point, current_timestamp):
         if self.in_highest_seg == False and new_point >= self.three_quarter_seg:
             self.in_highest_seg = True
-            self.highest_segment_tracker_list = [new_point]
+            self.highest_segment_tracker_list = [{"power": new_point, "timestamp": current_timestamp}]
             #print("Peak Started!")
         elif self.in_highest_seg == True and new_point >= self.three_quarter_seg:
-            self.highest_segment_tracker_list.append(new_point)
+            self.highest_segment_tracker_list.append({"power": new_point, "timestamp": current_timestamp})
         elif self.in_highest_seg == True and new_point < self.three_quarter_seg:
             self.in_highest_seg = False
             #print("Peak Ended!")
-            duration_in_highest_segment = len(self.highest_segment_tracker_list)
+            duration_in_highest_segment = self.highest_segment_tracker_list[-1]["timestamp"] - self.highest_segment_tracker_list[0]["timestamp"]
             self.highest_segment_tracker_list = []
-            self.highest_segment_durations.append(duration_in_highest_segment)
+            hours_in_highest_segment = duration_in_highest_segment/pd.Timedelta(hours=1)
+            self.highest_segment_durations.append(hours_in_highest_segment)
             self.upper_quartil_time_in_highest_segment = np.quantile(self.highest_segment_durations, 0.9)
 
     def charge_check(self, new_point):

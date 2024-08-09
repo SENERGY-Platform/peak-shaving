@@ -214,7 +214,7 @@ class Operator(OperatorBase):
                     self.one_min_data_window = [{"power": new_point, "time": current_timestamp}]
                     self.one_min_window_ended = True
                     
-                    self.load.track_high_seg(new_one_min_average_power)
+                    self.load.track_high_seg(new_one_min_average_power, current_timestamp)
                     self.load.update_max(new_one_min_average_power)
                     self.load.update_segments()
                     
