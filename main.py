@@ -96,7 +96,7 @@ class Operator(OperatorBase):
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
         self.job_id = load(self.config.data_path, JOB_ID_FILENAME, default=None)
-        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=True)
+        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
 
         self.one_min_data_window = []
 
