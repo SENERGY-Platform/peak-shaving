@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, Selector, logger, InitPhase, todatetime, timestamp_to_str, get_ts_format_from_str
+from operator_lib.util import OperatorBase, Selector, logger, InitPhase, todatetime, timestamp_to_str
 from operator_lib.util.persistence import save, load
 import operator_lib.util as util
 import os
@@ -24,9 +24,6 @@ import pandas as pd
 import numpy as np
 from load import Load
 from battery import Battery
-import mlflow
-import requests
-import json
 
 FIRST_DATA_FILENAME = "first_data_time.pickle"
 POWER_DATA_FILENAME = "power_data.pickle"
@@ -39,8 +36,6 @@ class CustomConfig(Config):
     data_path = "/opt/data"
     init_phase_length: float = 2
     init_phase_level: str = "d"
-    ml_trainer_url: str = "http://ml-trainer-svc.trainer:5000"
-    mlflow_url: str = "http://mlflow-svc.mlflow:5000"
     max_capacity: float = 500 # Wattstunden
 
     def __init__(self, d, **kwargs):
@@ -71,13 +66,8 @@ class Operator(OperatorBase):
             os.mkdir(self.data_path)
 
         self.device_id = None
-        self.job_id = None
-        self.model = None
 
         self.historic_data_available = None
-
-        self.ml_trainer_url = self.config.ml_trainer_url
-        self.mlflow_url = self.config.mlflow_url
 
         self.load = Load()
         self.battery = None
@@ -95,85 +85,13 @@ class Operator(OperatorBase):
 
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
-        self.job_id = load(self.config.data_path, JOB_ID_FILENAME, default=None)
-        self.training_started = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
+        self.training_happened = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
 
         self.one_min_data_window = []
 
-
-    def start_training(self, timestamp, raw_timestamp):
-        topic_name, path_to_time, path_to_value = self._get_input_topic()
-        job_request = {
-            "task": "peak_shaving",
-            "data_source": "kafka",
-            "data_settings": {
-                "name": topic_name,
-                "path_to_time": path_to_time,
-                "path_to_value": path_to_value,
-                "filterType": "device_id",
-                "filterValue": self.device_id,
-                "ksql_url": "http://ksql.kafka-sql:8088",
-                "timestamp_format": get_ts_format_from_str(raw_timestamp), # "yyyy-MM-ddTHH:mm:ss", #yyyy-MM-ddTHH:mm:ss.SSSZ
-                "time_range_value": "2",
-                "time_range_level": "d"
-            },
-            "toolbox_version": "v2.2.86",
-            "cluster": {
-                "memory_worker_limit": "20G"
-            },
-            "ray_image": "ghcr.io/senergy-platform/ray:v0.0.8",
-            "user_id": ""
-        }
-        util.logger.debug(f"PEAK SHAVING:        Start online training")
-        res = requests.post(self.ml_trainer_url + "/job", json=job_request)
-        util.logger.debug(f"PEAK SHAVING:        ML Trainer Response: {res.text}")
-        if res.status_code != 200:
-            util.logger.error(f"CPEAK SHAVING:        ant start training job {res.text}")
-            return
-        self.job_id = res.json()['task_id']
-        util.logger.debug(f"PEAK SHAVING:        Created Training Job with ID: {self.job_id}")
-        self.last_training_time = timestamp
-        save(self.data_path, JOB_ID_FILENAME, self.job_id)
-
-    def is_job_ready(self):
-        res = requests.get(self.ml_trainer_url + "/job/"+self.job_id)
-        res_data = res.json()
-        job_status = res_data['success'] 
-        util.logger.debug(f"PEAK SHAVING:        Training Job Status: {job_status}")
-        if job_status == 'error':
-            raise Exception(res_data['response'])
-
-        return job_status == 'done'
-    
-    def load_model(self):
-        mlflow.set_tracking_uri(self.mlflow_url)
-        model_uri = f"models:/{self.job_id}@production"
-        util.logger.debug(f"PEAK SHAVING:        Try to download model {self.job_id}")
-        self.model = mlflow.pyfunc.load_model(model_uri)
-        util.logger.debug(f"PEAK SHAVING:        Downloading model {self.job_id} was succesfull")
-        unwrapped_model = self.model.unwrap_python_model()
-        min_boundaries = unwrapped_model.get_cluster_min_boundaries()
-        max_boundaries = unwrapped_model.get_cluster_max_boundaries()
+    def training(self):
+        min_boundaries, max_boundaries = None, None
         return min_boundaries, max_boundaries
-
-    def _get_input_topic(self):
-        dep_config = util.DeploymentConfig()
-        config_json = json.loads(dep_config.config)
-        opr_config = util.OperatorConfig(config_json)
-        topic_name = None
-        path_to_time = None 
-        path_to_value = None
-        for input_topic in opr_config.inputTopics:
-            if self.device_id in input_topic.filterValue.split(','):
-                topic_name = input_topic.name
-                for mapping in input_topic.mappings:
-                    if mapping.dest == "Power":
-                        path_to_value = mapping.source
-                    
-                    if mapping.dest == "Power_Time":
-                        path_to_time = mapping.source
-
-        return topic_name, path_to_time, path_to_value
 
     def stop(self):
         save(self.data_path, POWER_DATA_FILENAME, self.power_data)
@@ -194,11 +112,8 @@ class Operator(OperatorBase):
 
             if current_timestamp < pd.Timestamp.now():
                 self.historic_data_available = True
-            if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_started:
-                self.start_training(current_timestamp, data['power_time'])
-                self.training_started = True
-            if self.job_id and self.is_job_ready() and not self.model:
-                min_boundaries, max_boundaries = self.load_model()
+            if self.historic_data_available and current_timestamp < pd.Timestamp.now() and not self.training_happened:
+                min_boundaries, max_boundaries = self.training()
                 util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
             new_point = data['power']
 
