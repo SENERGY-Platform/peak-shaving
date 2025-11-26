@@ -1,3 +1,11 @@
 git+https://github.com/SENERGY-Platform/analytics-operator-lib-python@v1.2.1
-KDEpy
-scipy.signal
+
+
+pandas<2
+numpy==1.26.4
+scipy
+scikit-learn == 1.3.0
+tqdm
+similaritymeasures
+pyarrow
+python-dotenv==1.0.0
