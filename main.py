@@ -27,6 +27,9 @@ from scipy.signal import argrelextrema
 from load import Load
 from battery import Battery
 
+import typing
+import datetime
+
 FIRST_DATA_FILENAME = "first_data_time.pickle"
 POWER_DATA_FILENAME = "power_data.pickle"
 BATTERY_DATA_FILENAME = "battery_data.pickle"
@@ -108,11 +111,13 @@ class Operator(OperatorBase):
         save(self.data_path, TRAINING_STARTED_FILENAME, self.training_started)
         super().stop()
         
-    def run(self, data, selector, device_id=None):
+    def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
+        # Convert to german time and then forget the timezone.
+        timestamp = pd.Timestamp(timestamp).tz_localize("Zulu").tz_convert("Europe/Berlin").tz_localize(None)
         if selector == "consumption_device":
             if not self.device_id:
                 self.device_id = device_id
-            current_timestamp = todatetime(data['power_time']).tz_localize(None)
+            current_timestamp = timestamp
             if not self.first_data_time:
                 self.first_data_time = current_timestamp
                 self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
@@ -185,7 +190,7 @@ class Operator(OperatorBase):
             return {"battery_power": self.battery_power, "timestamp": timestamp_to_str(current_timestamp), "trigger_battery": "yes", "initial_phase": ""}
         elif selector == "battery":
             current_capacity = data["capacity"]
-            capacity_time = todatetime(data["capacity_time"]).tz_localize(None)
+            capacity_time = timestamp
             logger.debug(f"PEAK SHAVING:        Current Capacity: {current_capacity}; time: {capacity_time}")
             if self.battery == None:
                 self.battery = Battery(current_capacity)
