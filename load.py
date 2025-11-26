@@ -15,12 +15,8 @@ class Load():
         self.discharge_power = None
         self.in_above_max_segment = False
         self.corrected_max = 0
-        self.clustering_labels = None
-        self.clusters = None
         self.min_boundaries_clusters = None
         self.max_boundaries_clusters = None
-        self.current_cluster = None
-        self.cluster_durations = None
 
     def update_max(self, new_point):
         if new_point > self.max:
