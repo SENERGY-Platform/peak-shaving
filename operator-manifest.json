@@ -1,0 +1,60 @@
+{
+  "inputs": [
+    {
+      "name": "power",
+      "type": "float"
+    },
+    {
+      "name": "capacity",
+      "type": "float"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "battery_power",
+      "type": "float"
+    },
+    {
+      "name": "timestamp",
+      "type": "string"
+    },
+    {
+      "name": "trigger_battery",
+      "type": "string"
+    },
+    {
+      "name": "initial_phase",
+      "type": "string"
+    }
+  ],
+  "config_values": [
+    {
+      "name": "init_phase_length",
+      "type": "float"
+    },
+    {
+      "name": "init_phase_level",
+      "type": "string"
+    },
+    {
+      "name": "max_capacity",
+      "type": "float"
+    },
+    {
+      "name": "max_charging_power",
+      "type": "float"
+    },
+    {
+      "name": "max_discharging_power",
+      "type": "float"
+    },
+    {
+      "name": "energy_reserve",
+      "type": "float"
+    },
+    {
+      "name": "logger_level",
+      "type": "string"
+    }
+  ]
+}
