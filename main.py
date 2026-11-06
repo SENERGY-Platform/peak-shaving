@@ -22,8 +22,6 @@ import operator_lib.util as util
 import os
 import pandas as pd
 import numpy as np
-from KDEpy import FFTKDE
-from scipy.signal import argrelextrema
 from load import Load
 from battery import Battery
 
@@ -33,8 +31,6 @@ import datetime
 FIRST_DATA_FILENAME = "first_data_time.pickle"
 POWER_DATA_FILENAME = "power_data.pickle"
 BATTERY_DATA_FILENAME = "battery_data.pickle"
-TRAINING_STARTED_FILENAME = "training_started.pickle"
-JOB_ID_FILENAME = "training_job_id.pickle"
 
 from operator_lib.util import Config
 class CustomConfig(Config):
@@ -72,10 +68,6 @@ class Operator(OperatorBase):
 
         self.device_id = None
 
-        self.historic_data_available = None
-
-        self.initial_training_data = []
-
         self.load = Load()
         self.battery = None
         self.battery_power = 0
@@ -92,23 +84,13 @@ class Operator(OperatorBase):
 
         self.power_data = load(self.config.data_path, POWER_DATA_FILENAME, default=[])
         self.battery_data = load(self.config.data_path, BATTERY_DATA_FILENAME, default=[])
-        self.training_happened = load(self.config.data_path, TRAINING_STARTED_FILENAME, default=None)
 
         self.one_min_data_window = []
-
-    def training(self, initial_training_array):
-        x, y = FFTKDE(kernel='gaussian', bw='silverman').fit(initial_training_array).evaluate()
-        local_minima = list(x[argrelextrema(y, np.less)[0]])
-        min_boundaries = [0]+local_minima
-        max_boundaries = local_minima+[max(initial_training_array)]
-        return min_boundaries, max_boundaries
 
     def stop(self):
         save(self.data_path, POWER_DATA_FILENAME, self.power_data)
         save(self.data_path, BATTERY_DATA_FILENAME, self.battery_data)
         save(self.data_path, FIRST_DATA_FILENAME, self.first_data_time)
-        save(self.data_path, JOB_ID_FILENAME, self.job_id)
-        save(self.data_path, TRAINING_STARTED_FILENAME, self.training_started)
         super().stop()
         
     def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
@@ -122,19 +104,7 @@ class Operator(OperatorBase):
                 self.first_data_time = current_timestamp
                 self.init_phase_handler = InitPhase(self.config.data_path, self.init_phase_duration, self.first_data_time, self.produce)
 
-            if current_timestamp < pd.Timestamp.now() - pd.Timedelta(1,"hour") and self.historic_data_available == None:
-                self.historic_data_available = True
-
             new_point = data['power']
-
-            if self.historic_data_available and not self.training_happened:
-                if current_timestamp - self.first_data_time <= pd.Timedelta(14,"day"):
-                    self.initial_training_data.append({"time": current_timestamp, "data": new_point})
-                else:
-                    initial_training_array = np.array([sample["data"] for sample in self.initial_training_data])
-                    min_boundaries, max_boundaries = self.training(initial_training_array)
-                    self.training_happened = True
-                    util.logger.debug(f"PEAK SHAVING:        Min boundaries: {min_boundaries}      Max boundaries: {max_boundaries}")
 
             if self.one_min_data_window == []:
                 self.one_min_data_window.append({"power": new_point, "time": current_timestamp})
